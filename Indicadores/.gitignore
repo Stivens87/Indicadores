@@ -4,3 +4,4 @@ obj/
 *.log
 node_modules/
 secrets.json
+appsettings.json
