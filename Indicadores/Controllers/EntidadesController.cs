@@ -23,13 +23,33 @@ namespace Indicadores.Controllers
     {
         private readonly ControlConexion controlConexion; // Servicio para manejar la conexión a la base de datos.
         private readonly IConfiguration _configuration; // Configuración de la aplicación para obtener valores de appsettings.json.
-        
+
         // Constructor que inyecta los servicios necesarios
         public EntidadesController(ControlConexion controlConexion, IConfiguration configuration)
         {
             this.controlConexion = controlConexion ?? throw new ArgumentNullException(nameof(controlConexion));
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         }
+
+        /// <summary>
+        /// Endpoint de la raíz de la API.
+        /// Muestra un mensaje de bienvenida con información básica sobre la API.
+        /// </summary>
+        /// <returns>Un mensaje JSON con información de la API.</returns>
+        [AllowAnonymous] // Permite acceso sin autenticación
+        [HttpGet("/")]
+        public IActionResult Inicio()
+        {
+            var mensaje = new
+            {
+                Mensaje = "Bienvenido al Proyecto Indicadores en C#!",
+                Documentación = "Para más detalles, visita /swagger",
+                FechaServidor = DateTime.UtcNow
+            };
+
+            return Ok(mensaje);
+        }
+
 
 
 
@@ -49,7 +69,7 @@ namespace Indicadores.Controllers
         public IActionResult Listar(string nombreProyecto, string nombreTabla) // Método para listar los registros de una tabla específica.
         {
             // Verifica si el nombre de la tabla es nulo o vacío
-            if (string.IsNullOrWhiteSpace(nombreTabla)) 
+            if (string.IsNullOrWhiteSpace(nombreTabla))
                 return BadRequest("El nombre de la tabla no puede estar vacío.");
 
             try
@@ -65,7 +85,7 @@ namespace Indicadores.Controllers
                 foreach (DataRow fila in tablaResultados.Rows)
                 {
                     var propiedadesFila = fila.Table.Columns.Cast<DataColumn>()
-                        .ToDictionary(columna => columna.ColumnName, 
+                        .ToDictionary(columna => columna.ColumnName,
                                     columna => fila[columna] == DBNull.Value ? null : fila[columna]);
                     listaFilas.Add(propiedadesFila); // Agrega la fila convertida a la lista.
                 }
@@ -327,24 +347,24 @@ namespace Indicadores.Controllers
         {
             // Verifica si el nombre de la tabla es nulo o vacío, o si los datos a insertar están vacíos.
             if (string.IsNullOrWhiteSpace(nombreTabla) || datosEntidad == null || !datosEntidad.Any())
-                return BadRequest("El nombre de la tabla y los datos de la entidad no pueden estar vacíos.");  
-                // Retorna un error HTTP 400 si algún parámetro requerido está vacío.
+                return BadRequest("El nombre de la tabla y los datos de la entidad no pueden estar vacíos.");
+            // Retorna un error HTTP 400 si algún parámetro requerido está vacío.
 
             try
             {
                 // Convierte los datos recibidos en un diccionario con las claves y valores adecuados.
                 var propiedades = datosEntidad.ToDictionary(
-                    kvp => kvp.Key, 
-                    kvp => kvp.Value is JsonElement elementoJson 
+                    kvp => kvp.Key,
+                    kvp => kvp.Value is JsonElement elementoJson
                         ? ConvertirJsonElement(elementoJson) // Convierte valores JSON a tipos de datos de C#
-                        : kvp.Value 
+                        : kvp.Value
                 );
 
                 // Definir una lista de posibles nombres de claves que representan contraseñas.
                 var clavesContrasena = new[] { "password", "contrasena", "passw", "clave" };
 
                 // Verifica si alguno de los campos en los datos coincide con un posible campo de contraseña.
-                var claveContrasena = propiedades.Keys.FirstOrDefault(k => 
+                var claveContrasena = propiedades.Keys.FirstOrDefault(k =>
                     clavesContrasena.Any(pk => k.IndexOf(pk, StringComparison.OrdinalIgnoreCase) >= 0)
                 );
 
@@ -360,7 +380,7 @@ namespace Indicadores.Controllers
                 }
 
                 // Obtiene el proveedor de base de datos desde la configuración.
-                string proveedor = _configuration["DatabaseProvider"] ?? 
+                string proveedor = _configuration["DatabaseProvider"] ??
                     throw new InvalidOperationException("Proveedor de base de datos no configurado.");
 
                 // Construye la lista de columnas y valores a insertar en la tabla.
@@ -371,7 +391,7 @@ namespace Indicadores.Controllers
                 string consultaSQL = $"INSERT INTO {nombreTabla} ({columnas}) VALUES ({valores})";
 
                 // Crea los parámetros para la consulta SQL.
-                var parametros = propiedades.Select(p => 
+                var parametros = propiedades.Select(p =>
                     CrearParametro($"{ObtenerPrefijoParametro(proveedor)}{p.Key}", p.Value)
                 ).ToArray();
 
@@ -393,7 +413,7 @@ namespace Indicadores.Controllers
             catch (Exception ex) // Captura cualquier error inesperado.
             {
                 Console.WriteLine($"Ocurrió una excepción: {ex.Message}"); // Imprime el error en la consola.
-                return StatusCode(500, $"Error interno del servidor: {ex.Message}"); 
+                return StatusCode(500, $"Error interno del servidor: {ex.Message}");
                 // Retorna un error HTTP 500 indicando que ocurrió un problema en el servidor.
             }
         }
@@ -464,7 +484,7 @@ namespace Indicadores.Controllers
                 // Verifica si hay un campo de contraseña en los datos, y si lo hay, lo hashea.
                 var clavesContrasena = new[] { "password", "contrasena", "passw", "clave" }; // Lista de posibles nombres para campos de contraseña.
                 var claveContrasena = propiedades.Keys.FirstOrDefault(k => clavesContrasena.Any(pk => k.IndexOf(pk, StringComparison.OrdinalIgnoreCase) >= 0)); // Busca si alguno de los campos es una contraseña.
-                
+
                 if (claveContrasena != null) // Si se encontró un campo de contraseña.
                 {
                     var contrasenaPlano = propiedades[claveContrasena]?.ToString(); // Obtiene el valor de la contraseña.
@@ -559,12 +579,12 @@ namespace Indicadores.Controllers
         /// <response code="500">Error interno del servidor.</response>
         [AllowAnonymous] // Permite el acceso sin autenticación a este endpoint.
         [HttpPost("verificar-contrasena")] // Define la ruta HTTP POST como "/api/{nombreProyecto}/{nombreTabla}/verificar-contrasena".
-        public IActionResult VerificarContrasena(string nombreProyecto, string nombreTabla, [FromBody] Dictionary<string, string> datos) 
+        public IActionResult VerificarContrasena(string nombreProyecto, string nombreTabla, [FromBody] Dictionary<string, string> datos)
         // Método que verifica si la contraseña ingresada coincide con la almacenada en la base de datos.
         {
             // Verifica que los parámetros esenciales no sean nulos o vacíos.
-            if (string.IsNullOrWhiteSpace(nombreTabla) || datos == null || 
-                !datos.ContainsKey("campoUsuario") || !datos.ContainsKey("campoContrasena") || 
+            if (string.IsNullOrWhiteSpace(nombreTabla) || datos == null ||
+                !datos.ContainsKey("campoUsuario") || !datos.ContainsKey("campoContrasena") ||
                 !datos.ContainsKey("valorUsuario") || !datos.ContainsKey("valorContrasena"))
             {
                 return BadRequest("El nombre de la tabla, el campo de usuario, el campo de contraseña, el valor de usuario y el valor de contraseña no pueden estar vacíos.");
@@ -710,7 +730,7 @@ namespace Indicadores.Controllers
             }
         }
 
-}
+    }
 }
 
 /*
